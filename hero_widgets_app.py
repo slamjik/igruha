@@ -9,13 +9,18 @@ ANIMATION_FRAME_DELAY = 10
 
 
 class Hero:
-    def __init__(self, idle_path: str, move_path: str, center_x: float, center_y: float, scale: float = 3.0):
+    def __init__(self, idle_path: str, move_path: str, center_x: float, center_y: float, scale: float = 2.5):
         self.idle_texture = arcade.load_texture(idle_path)
         self.move_texture = arcade.load_texture(move_path)
-        self.sprite = arcade.Sprite(center_x=center_x, center_y=center_y)
+
+        self.sprite = arcade.Sprite(
+            self.idle_texture,
+            center_x=center_x,
+            center_y=center_y,
+            scale=scale
+        )
         self.sprite.textures = [self.idle_texture, self.move_texture]
         self.sprite.texture = self.idle_texture
-        self.sprite.scale = scale
 
 
 class MainWindow(arcade.Window):
@@ -24,6 +29,7 @@ class MainWindow(arcade.Window):
         arcade.set_background_color(arcade.color.GRAY)
 
         self.ui_manager = arcade.gui.UIManager()
+        self.ui_manager.enable()
 
         center_x = SCREEN_WIDTH / 2
         center_y = SCREEN_HEIGHT / 2 - 30
@@ -63,19 +69,11 @@ class MainWindow(arcade.Window):
         self._setup_ui()
 
     def _setup_ui(self):
-        self.ui_manager.enable()
-
-        button_style = {
-            "font_name": "Arial",
-            "font_size": 14,
-            "font_color": arcade.color.WHITE,
-        }
-
         box = arcade.gui.UIBoxLayout(vertical=False, space_between=12)
 
-        green_button = arcade.gui.UIFlatButton(text="Green Worm", width=150, **button_style)
-        slime_button = arcade.gui.UIFlatButton(text="Slime Blue", width=150, **button_style)
-        frog_button = arcade.gui.UIFlatButton(text="Frog", width=150, **button_style)
+        green_button = arcade.gui.UIFlatButton(text="Green Worm", width=150)
+        slime_button = arcade.gui.UIFlatButton(text="Slime Blue", width=150)
+        frog_button = arcade.gui.UIFlatButton(text="Frog", width=150)
 
         @green_button.event("on_click")
         def _on_green_click(_event):
@@ -93,14 +91,21 @@ class MainWindow(arcade.Window):
         box.add(slime_button)
         box.add(frog_button)
 
-        anchor = arcade.gui.UIAnchorWidget(anchor_x="center_x", anchor_y="top", child=box, align_y=-30)
+        anchor = arcade.gui.UIAnchorWidget(
+            anchor_x="center_x",
+            anchor_y="top",
+            child=box,
+            align_y=-30
+        )
         self.ui_manager.add(anchor)
 
     def _switch_hero(self, hero_name: str):
         old_x = self.current_hero.sprite.center_x
         old_y = self.current_hero.sprite.center_y
+
         self.current_hero_name = hero_name
         self.current_hero = self.heroes[hero_name]
+
         self.current_hero.sprite.center_x = old_x
         self.current_hero.sprite.center_y = old_y
         self.current_hero.sprite.texture = self.current_hero.sprite.textures[self.animation_texture_index]
@@ -111,20 +116,14 @@ class MainWindow(arcade.Window):
         self.current_hero.sprite.draw()
 
     def on_update(self, delta_time: float):
-        change_x = 0
-        change_y = 0
-
         if self.left_pressed:
-            change_x -= MOVEMENT_SPEED
+            self.current_hero.sprite.center_x -= MOVEMENT_SPEED
         if self.right_pressed:
-            change_x += MOVEMENT_SPEED
+            self.current_hero.sprite.center_x += MOVEMENT_SPEED
         if self.up_pressed:
-            change_y += MOVEMENT_SPEED
+            self.current_hero.sprite.center_y += MOVEMENT_SPEED
         if self.down_pressed:
-            change_y -= MOVEMENT_SPEED
-
-        self.current_hero.sprite.center_x += change_x
-        self.current_hero.sprite.center_y += change_y
+            self.current_hero.sprite.center_y -= MOVEMENT_SPEED
 
         self.animation_frame_counter += 1
         if self.animation_frame_counter >= ANIMATION_FRAME_DELAY:
