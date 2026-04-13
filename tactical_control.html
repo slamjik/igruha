@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Тактические крестики-нолики: Контроль</title>
+  <style>
+    :root {
+      --bg: #0b1022;
+      --bg2: #131b3b;
+      --card: #111933;
+      --card2: #1c2751;
+      --text: #ecf1ff;
+      --muted: #9fb0e4;
+      --line: #31427d;
+      --x: #67c5ff;
+      --o: #ff82ad;
+      --ok: #31d0a2;
+      --warn: #f5b13e;
+      --danger: #ff6f7f;
+      --zone: #2f2411;
+      --block: #3b4458;
+      --bonus: #103b2a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #1a2a5c 0%, var(--bg) 56%);
+      color: var(--text);
+      font-family: Inter, Segoe UI, Roboto, sans-serif;
+      padding: 18px;
+      display: grid;
+      place-items: center;
+    }
+
+    .app {
+      width: min(1100px, 100%);
+      background: linear-gradient(165deg, var(--card), var(--card2));
+      border: 1px solid #3b4f97;
+      border-radius: 16px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .42);
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+    }
+
+    .panel {
+      background: rgba(8, 12, 26, .56);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.16rem;
+    }
+
+    .hint { color: var(--muted); font-size: .92rem; margin: 0; }
+
+    .setup {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+      align-items: end;
+    }
+
+    label { font-size: .85rem; color: var(--muted); }
+
+    select, button {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid #435aa6;
+      background: #0f1735;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: .92rem;
+    }
+
+    button { cursor: pointer; }
+    button:hover:not(:disabled) { filter: brightness(1.08); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .rules {
+      margin-top: 10px;
+      font-size: .86rem;
+      color: var(--muted);
+      line-height: 1.35;
+      display: grid;
+      gap: 4px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(340px, 1fr) 300px;
+      gap: 14px;
+    }
+
+    .board {
+      background: #0a1128;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      border: 1px solid #2d3d74;
+      border-radius: 10px;
+      background: linear-gradient(160deg, #111a3d, #101734);
+      position: relative;
+      display: grid;
+      place-items: center;
+      font-size: 1.7rem;
+      font-weight: 700;
+      transition: transform .12s ease;
+    }
+
+    .cell:hover { transform: translateY(-1px); }
+    .cell.blocked { background: var(--block); border-color: #697187; }
+    .cell.bonus { background: var(--bonus); box-shadow: inset 0 0 0 2px #1f8259; }
+    .cell.zone { background: linear-gradient(160deg, #2d2513, var(--zone)); }
+    .cell.threat { box-shadow: inset 0 0 0 2px var(--danger); }
+
+    .coord {
+      position: absolute;
+      left: 6px;
+      top: 5px;
+      font-size: .62rem;
+      color: #91a4e7;
+      font-weight: 500;
+    }
+
+    .x { color: var(--x); }
+    .o { color: var(--o); }
+
+    .side { display: grid; gap: 10px; align-content: start; }
+
+    .actions {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .state {
+      display: grid;
+      gap: 5px;
+      font-size: .9rem;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: .76rem;
+      border: 1px solid #455ea9;
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+
+    .log {
+      max-height: 270px;
+      overflow: auto;
+      border: 1px solid #2f417f;
+      border-radius: 10px;
+      background: #0d1531;
+      padding: 8px;
+      display: grid;
+      gap: 4px;
+      font-size: .84rem;
+    }
+
+    @media (max-width: 960px) {
+      .top, .main { grid-template-columns: 1fr; }
+      .setup { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="top">
+      <div class="panel">
+        <h1>🎯 Тактические крестики-нолики: «Контроль»</h1>
+        <p class="hint">Локальная PvP-дуэль. Поле 5×5, победа — 4 в ряд. Игра на расчёт AP, контроль зон и блеф.</p>
+
+        <div class="setup">
+          <div>
+            <label for="roleX">Роль игрока X</label>
+            <select id="roleX">
+              <option value="controller">🛡️ Контроллер</option>
+              <option value="aggressor">🧨 Агрессор</option>
+              <option value="manipulator">🕵️ Манипулятор</option>
+            </select>
+          </div>
+          <div>
+            <label for="roleO">Роль игрока O</label>
+            <select id="roleO">
+              <option value="controller">🛡️ Контроллер</option>
+              <option value="aggressor">🧨 Агрессор</option>
+              <option value="manipulator">🕵️ Манипулятор</option>
+            </select>
+          </div>
+          <div>
+            <label for="mind">Режим отображения</label>
+            <select id="mind">
+              <option value="normal">Обычный</option>
+              <option value="mind">🧠 Mind game</option>
+            </select>
+          </div>
+          <div>
+            <label for="gameMode">Режим матча</label>
+            <select id="gameMode">
+              <option value="pve">Против бота</option>
+              <option value="pvp">Локальный PvP</option>
+            </select>
+          </div>
+          <div>
+            <label for="botLevel">Сложность бота</label>
+            <select id="botLevel">
+              <option value="easy">Лёгкий</option>
+              <option value="normal" selected>Средний</option>
+              <option value="hard">Сложный</option>
+            </select>
+          </div>
+          <button id="restart">Новая партия</button>
+        </div>
+
+        <div class="rules">
+          <div>• На старте хода у игрока 2 AP.</div>
+          <div>• Поставить метку: 1 AP (+1 AP рядом с вражеской зоной контроля).</div>
+          <div>• Брандмауэр: блок клетки на 2 хода (2 AP, перезарядка 3 хода).</div>
+          <div>• Сканер: раскрывает скрытые метки до конца хода (1 AP, перезарядка 2).</div>
+          <div>• Эксплойт: снимает блокировку с клетки (2 AP, перезарядка 3).</div>
+          <div>• Комбо: 3 в ряд = +1 AP; вилка (2 победных продолжения) = +2 AP.</div>
+          <div>• Анти-кемпинг: 2 пустых хода подряд → следующий ход с 1 AP.</div>
+          <div>• Каждые 3 установки на поле происходит событие: случайный блок/усиление.</div>
+          <div>• В режиме «Против бота» бот играет за O (уровни: лёгкий/средний/сложный).</div>
+        </div>
+      </div>
+
+      <div class="panel state" id="status"></div>
+    </section>
+
+    <section class="main">
+      <div class="board" id="board"></div>
+      <aside class="side">
+        <section class="panel">
+          <strong>Действия</strong>
+          <div class="actions">
+            <button id="modePlace">Режим: установка</button>
+            <button id="endTurn">Завершить ход</button>
+            <button id="firewall">Брандмауэр</button>
+            <button id="scan">Сканер</button>
+            <button id="exploit">Эксплойт</button>
+            <button id="rollback">Откат ×1</button>
+            <button id="roleSkill" style="grid-column: span 2"></button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <strong>Журнал</strong>
+          <div class="log" id="log"></div>
+        </section>
+      </aside>
+    </section>
+  </div>
+
+  <script>
+    const SIZE = 5;
+    const WIN_LEN = 4;
+    const DIRS = [[1,0],[0,1],[1,1],[1,-1]];
+
+    const ROLE_META = {
+      controller: { name: 'Контроллер', button: 'Роль: Локдаун (1 AP)' },
+      aggressor: { name: 'Агрессор', button: 'Роль: Штурм ×1' },
+      manipulator: { name: 'Манипулятор', button: 'Роль: Тень ×1' }
+    };
+
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+
+    const ui = {
+      roleX: document.getElementById('roleX'),
+      roleO: document.getElementById('roleO'),
+      mind: document.getElementById('mind'),
+      gameMode: document.getElementById('gameMode'),
+      botLevel: document.getElementById('botLevel'),
+      restart: document.getElementById('restart'),
+      modePlace: document.getElementById('modePlace'),
+      endTurn: document.getElementById('endTurn'),
+      firewall: document.getElementById('firewall'),
+      scan: document.getElementById('scan'),
+      exploit: document.getElementById('exploit'),
+      rollback: document.getElementById('rollback'),
+      roleSkill: document.getElementById('roleSkill')
+    };
+
+    let G;
+
+    function makeCell() {
+      return { owner: null, hidden: false, blocked: 0, bonus: false };
+    }
+
+    function makePlayer(sym, role) {
+      return {
+        sym,
+        role,
+        ap: 2,
+        placementsThisTurn: 0,
+        passiveTurns: 0,
+        cds: { firewall: 0, scan: 0, exploit: 0 },
+        once: {
+          rollback: true,
+          assault: role === 'aggressor',
+          shadow: role === 'manipulator'
+        },
+        comboUsedTurn: false
+      };
+    }
+
+    function init() {
+      G = {
+        board: Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, makeCell)),
+        current: 'X',
+        turn: 1,
+        placementsTotal: 0,
+        mode: 'place',
+        gameOver: false,
+        winner: null,
+        revealFor: null,
+        mindMode: ui.mind.value === 'mind',
+        gameMode: ui.gameMode.value,
+        botLevel: ui.botLevel.value,
+        botSymbol: ui.gameMode.value === 'pve' ? 'O' : null,
+        botBusy: false,
+        threatCells: [],
+        assaultRemaining: 0,
+        startSnapshot: null,
+        players: {
+          X: makePlayer('X', ui.roleX.value),
+          O: makePlayer('O', ui.roleO.value)
+        }
+      };
+
+      logEl.innerHTML = '';
+      buildBoard();
+      setStartSnapshot();
+      log('Новая партия. Первый ход: X.');
+      updateThreats();
+      render();
+      maybeStartBotTurn();
+    }
+
+    function buildBoard() {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const b = document.createElement('button');
+          b.className = 'cell';
+          b.dataset.r = r;
+          b.dataset.c = c;
+          b.addEventListener('click', onCellClick);
+          boardEl.appendChild(b);
+        }
+      }
+    }
+
+    function current() { return G.players[G.current]; }
+    function enemySym(sym) { return sym === 'X' ? 'O' : 'X'; }
+    function opponent() { return G.players[enemySym(G.current)]; }
+    function inside(r, c) { return r >= 0 && c >= 0 && r < SIZE && c < SIZE; }
+    function coord(r, c) { return `${String.fromCharCode(65 + c)}${r + 1}`; }
+
+    function onCellClick(e) {
+      if (G.gameOver || isBotTurn()) return;
+      const r = Number(e.currentTarget.dataset.r);
+      const c = Number(e.currentTarget.dataset.c);
+
+      if (G.mode === 'place') place(r, c, false, false);
+      else if (G.mode === 'shadow') place(r, c, true, false);
+      else if (G.mode === 'assault') place(r, c, false, true);
+      else if (G.mode === 'firewall') castFirewall(r, c);
+      else if (G.mode === 'exploit') castExploit(r, c);
+      else if (G.mode === 'lock') castLock(r, c);
+
+      render();
+      maybeStartBotTurn();
+    }
+
+    function place(r, c, hidden, fromAssault) {
+      const p = current();
+      const cell = G.board[r][c];
+      if (cell.owner || cell.blocked > 0) return false;
+
+      const tax = fromAssault ? 0 : zoneTax(r, c, p.sym);
+      const cost = fromAssault ? 0 : (1 + tax);
+      if (p.ap < cost) return false;
+
+      p.ap -= cost;
+      p.placementsThisTurn += 1;
+      cell.owner = p.sym;
+      cell.hidden = hidden;
+      G.placementsTotal += 1;
+
+      if (cell.bonus) {
+        cell.bonus = false;
+        p.ap += 1;
+        log(`${p.sym} захватил усиленную клетку ${coord(r, c)} (+1 AP).`);
+      }
+
+      applyComboBonus(p.sym);
+
+      if (checkWin(p.sym)) {
+        G.gameOver = true;
+        G.winner = p.sym;
+        log(`🏁 Победа игрока ${p.sym}.`);
+      } else if (isBoardFull()) {
+        G.gameOver = true;
+        G.winner = 'draw';
+        log('Ничья: свободных клеток не осталось.');
+      }
+
+      if (!G.gameOver && G.placementsTotal % 3 === 0) triggerEvent();
+
+      if (G.mode === 'shadow') {
+        p.once.shadow = false;
+        G.mode = 'place';
+        log(`${p.sym} применил «Тень»: метка скрыта.`);
+      }
+
+      if (G.mode === 'assault') {
+        G.assaultRemaining -= 1;
+        if (G.assaultRemaining <= 0 || G.gameOver) {
+          G.mode = 'place';
+          p.once.assault = false;
+          log(`${p.sym} завершил «Штурм».`);
+        }
+      }
+
+      updateThreats();
+      return true;
+    }
+
+    function zoneTax(r, c, mySym) {
+      const enemy = enemySym(mySym);
+      const pairs = adjacentPairs(enemy);
+      for (const [a, b] of pairs) {
+        if (isNearPair(r, c, a, b)) return 1;
+      }
+      return 0;
+    }
+
+    function adjacentPairs(sym) {
+      const pairs = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (G.board[r][c].owner !== sym) continue;
+          if (c + 1 < SIZE && G.board[r][c + 1].owner === sym) pairs.push([[r,c], [r,c+1]]);
+          if (r + 1 < SIZE && G.board[r + 1][c].owner === sym) pairs.push([[r,c], [r+1,c]]);
+        }
+      }
+      return pairs;
+    }
+
+    function isNearPair(r, c, a, b) {
+      const [r1, c1] = a;
+      const [r2, c2] = b;
+      return Math.max(Math.abs(r - r1), Math.abs(c - c1)) <= 1 || Math.max(Math.abs(r - r2), Math.abs(c - c2)) <= 1;
+    }
+
+    function castFirewall(r, c) {
+      const p = current();
+      const cell = G.board[r][c];
+      if (p.ap < 2 || p.cds.firewall > 0 || cell.owner) return false;
+      p.ap -= 2;
+      p.cds.firewall = 3;
+      cell.blocked = Math.max(cell.blocked, 2);
+      G.mode = 'place';
+      log(`${p.sym} ставит «Брандмауэр» на ${coord(r, c)}.`);
+      return true;
+    }
+
+    function castExploit(r, c) {
+      const p = current();
+      const cell = G.board[r][c];
+      if (p.ap < 2 || p.cds.exploit > 0 || cell.blocked <= 0) return false;
+      p.ap -= 2;
+      p.cds.exploit = 3;
+      cell.blocked = 0;
+      G.mode = 'place';
+      log(`${p.sym} применил «Эксплойт» и снял блок с ${coord(r, c)}.`);
+      return true;
+    }
+
+    function castLock(r, c) {
+      const p = current();
+      const cell = G.board[r][c];
+      if (p.role !== 'controller' || p.ap < 1 || cell.owner || cell.blocked > 0) return false;
+      p.ap -= 1;
+      cell.blocked = 1;
+      G.mode = 'place';
+      log(`${p.sym} применил «Локдаун» на ${coord(r, c)}.`);
+      return true;
+    }
+
+    function scan() {
+      const p = current();
+      if (p.ap < 1 || p.cds.scan > 0) return;
+      p.ap -= 1;
+      p.cds.scan = 2;
+      G.revealFor = p.sym;
+      log(`${p.sym} активировал «Сканер»: скрытые метки видны до конца хода.`);
+      render();
+    }
+
+    function applyComboBonus(sym) {
+      const p = G.players[sym];
+      if (p.comboUsedTurn) return;
+
+      let bonus = 0;
+      if (hasRow(sym, 3)) bonus += 1;
+      if (countWinningMoves(sym) >= 2) bonus += 2;
+      bonus = Math.min(2, bonus);
+
+      if (bonus > 0) {
+        p.ap += bonus;
+        p.comboUsedTurn = true;
+        log(`${sym} получает комбо-бонус +${bonus} AP.`);
+      }
+    }
+
+    function hasRow(sym, need) {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          for (const [dr, dc] of DIRS) {
+            let cnt = 0;
+            for (let k = 0; k < need; k++) {
+              const rr = r + dr * k;
+              const cc = c + dc * k;
+              if (!inside(rr, cc) || G.board[rr][cc].owner !== sym) break;
+              cnt += 1;
+            }
+            if (cnt === need) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function countWinningMoves(sym) {
+      let n = 0;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = G.board[r][c];
+          if (cell.owner || cell.blocked > 0) continue;
+          cell.owner = sym;
+          if (checkWin(sym)) n += 1;
+          cell.owner = null;
+        }
+      }
+      return n;
+    }
+
+    function triggerEvent() {
+      const candidates = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = G.board[r][c];
+          if (!cell.owner && cell.blocked === 0 && !cell.bonus) candidates.push([r, c]);
+        }
+      }
+      if (!candidates.length) return;
+
+      const [r, c] = candidates[Math.floor(Math.random() * candidates.length)];
+      if (Math.random() < 0.5) {
+        G.board[r][c].blocked = 1;
+        log(`🌪️ Событие: клетка ${coord(r, c)} временно заблокирована.`);
+      } else {
+        G.board[r][c].bonus = true;
+        log(`⚡ Событие: клетка ${coord(r, c)} усилена (+1 AP при установке).`);
+      }
+    }
+
+    function checkWin(sym) {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          for (const [dr, dc] of DIRS) {
+            let cnt = 0;
+            for (let k = 0; k < WIN_LEN; k++) {
+              const rr = r + dr * k;
+              const cc = c + dc * k;
+              if (!inside(rr, cc) || G.board[rr][cc].owner !== sym) break;
+              cnt += 1;
+            }
+            if (cnt === WIN_LEN) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function detectThreatCells(sym) {
+      const out = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = G.board[r][c];
+          if (cell.owner || cell.blocked > 0) continue;
+          cell.owner = sym;
+          if (countNearWins(sym) > 0) out.push([r, c]);
+          cell.owner = null;
+        }
+      }
+      return out;
+    }
+
+    function countNearWins(sym) {
+      let lines = 0;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          for (const [dr, dc] of DIRS) {
+            let mine = 0;
+            let free = 0;
+            for (let k = 0; k < WIN_LEN; k++) {
+              const rr = r + dr * k;
+              const cc = c + dc * k;
+              if (!inside(rr, cc)) {
+                mine = -99;
+                break;
+              }
+              const own = G.board[rr][cc].owner;
+              if (own === sym) mine += 1;
+              else if (!own) free += 1;
+            }
+            if (mine === WIN_LEN - 1 && free === 1) lines += 1;
+          }
+        }
+      }
+      return lines;
+    }
+
+    function isBoardFull() {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (!G.board[r][c].owner) return false;
+        }
+      }
+      return true;
+    }
+
+    function setStartSnapshot() {
+      G.startSnapshot = {
+        player: G.current,
+        board: JSON.parse(JSON.stringify(G.board)),
+        players: JSON.parse(JSON.stringify(G.players)),
+        placementsTotal: G.placementsTotal,
+        threatCells: JSON.parse(JSON.stringify(G.threatCells))
+      };
+    }
+
+    function rollback() {
+      const p = current();
+      if (!p.once.rollback || !G.startSnapshot || G.startSnapshot.player !== p.sym) return;
+
+      G.board = JSON.parse(JSON.stringify(G.startSnapshot.board));
+      G.players = JSON.parse(JSON.stringify(G.startSnapshot.players));
+      G.placementsTotal = G.startSnapshot.placementsTotal;
+      G.threatCells = JSON.parse(JSON.stringify(G.startSnapshot.threatCells));
+      G.mode = 'place';
+      G.revealFor = null;
+      G.assaultRemaining = 0;
+      G.gameOver = false;
+      G.winner = null;
+
+      G.players[p.sym].once.rollback = false;
+      log(`${p.sym} использовал «Откат» и вернул состояние к началу своего хода.`);
+      render();
+    }
+
+    function endTurn() {
+      if (G.gameOver || G.botBusy) return;
+      const p = current();
+
+      if (p.placementsThisTurn === 0) p.passiveTurns += 1;
+      else p.passiveTurns = 0;
+
+      p.placementsThisTurn = 0;
+      p.comboUsedTurn = false;
+      G.revealFor = null;
+      G.mode = 'place';
+      G.assaultRemaining = 0;
+
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (G.board[r][c].blocked > 0) G.board[r][c].blocked -= 1;
+        }
+      }
+
+      G.current = enemySym(G.current);
+      G.turn += 1;
+
+      const next = current();
+      Object.keys(next.cds).forEach(k => next.cds[k] = Math.max(0, next.cds[k] - 1));
+      next.ap = next.passiveTurns >= 2 ? 1 : 2;
+      if (next.passiveTurns >= 2) {
+        log(`⛓️ Анти-кемпинг: ${next.sym} начинает ход с 1 AP.`);
+      }
+
+      updateThreats();
+      setStartSnapshot();
+      render();
+      maybeStartBotTurn();
+    }
+
+    function isBotTurn() {
+      return G.gameMode === 'pve' && G.current === G.botSymbol;
+    }
+
+    function maybeStartBotTurn() {
+      if (!isBotTurn() || G.gameOver || G.botBusy) return;
+      G.botBusy = true;
+      setTimeout(runBotTurn, 420);
+    }
+
+    function runBotTurn() {
+      if (!isBotTurn() || G.gameOver) {
+        G.botBusy = false;
+        return;
+      }
+
+      const stepsLimit = 6;
+      let steps = 0;
+      while (!G.gameOver && isBotTurn() && current().ap > 0 && steps < stepsLimit) {
+        if (!botTakeAction()) break;
+        steps += 1;
+      }
+
+      G.botBusy = false;
+      if (!G.gameOver && isBotTurn()) {
+        endTurn();
+      } else {
+        render();
+      }
+    }
+
+    function botTakeAction() {
+      const level = G.botLevel;
+      const bot = current();
+      const human = opponent();
+
+      if (level !== 'easy') {
+        const win = pickWinningMove(bot.sym);
+        if (win) return place(win.r, win.c, false, false);
+
+        const block = pickWinningMove(human.sym);
+        if (block) {
+          if (bot.role === 'controller' && bot.ap >= 1) {
+            if (castLock(block.r, block.c)) return true;
+          }
+          return place(block.r, block.c, false, false);
+        }
+      }
+
+      if (level === 'hard') {
+        if (bot.cds.firewall === 0 && bot.ap >= 2) {
+          const danger = pickWinningMove(human.sym);
+          if (danger && !G.board[danger.r][danger.c].owner) {
+            G.mode = 'firewall';
+            if (castFirewall(danger.r, danger.c)) return true;
+          }
+        }
+        if (bot.role === 'aggressor' && bot.once.assault && bot.ap >= 1 && countEmptyCells() >= 3) {
+          bot.ap -= 1;
+          bot.once.assault = false;
+          G.mode = 'place';
+          for (let i = 0; i < 2; i++) {
+            const best = pickBestCell(bot.sym, level);
+            if (!best) break;
+            place(best.r, best.c, false, true);
+          }
+          return true;
+        }
+      }
+
+      if (bot.role === 'manipulator' && bot.once.shadow && bot.ap >= 1 && level !== 'easy') {
+        const best = pickBestCell(bot.sym, level);
+        if (best) return place(best.r, best.c, true, false);
+      }
+
+      if (bot.cds.exploit === 0 && bot.ap >= 2) {
+        const target = pickBlockedPriorityCell(bot.sym);
+        if (target) {
+          G.mode = 'exploit';
+          if (castExploit(target.r, target.c)) return true;
+        }
+      }
+
+      const chosen = pickBestCell(bot.sym, level);
+      if (!chosen) return false;
+      return place(chosen.r, chosen.c, false, false);
+    }
+
+    function pickWinningMove(sym) {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = G.board[r][c];
+          if (cell.owner || cell.blocked > 0) continue;
+          cell.owner = sym;
+          const win = checkWin(sym);
+          cell.owner = null;
+          if (win) return { r, c };
+        }
+      }
+      return null;
+    }
+
+    function pickBlockedPriorityCell(sym) {
+      let best = null;
+      let bestScore = -Infinity;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = G.board[r][c];
+          if (cell.blocked <= 0 || cell.owner) continue;
+          const s = evaluateCell(sym, r, c, true);
+          if (s > bestScore) {
+            best = { r, c };
+            bestScore = s;
+          }
+        }
+      }
+      return best;
+    }
+
+    function pickBestCell(sym, level) {
+      const options = [];
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const cell = G.board[r][c];
+          if (cell.owner || cell.blocked > 0) continue;
+          options.push({ r, c, score: evaluateCell(sym, r, c, false) });
+        }
+      }
+      if (!options.length) return null;
+
+      if (level === 'easy') {
+        return options[Math.floor(Math.random() * options.length)];
+      }
+
+      options.sort((a, b) => b.score - a.score);
+      if (level === 'normal') {
+        const top = options.slice(0, Math.min(4, options.length));
+        return top[Math.floor(Math.random() * top.length)];
+      }
+      return options[0];
+    }
+
+    function evaluateCell(sym, r, c, ignoreBlocked) {
+      const cell = G.board[r][c];
+      if (!ignoreBlocked && (cell.owner || cell.blocked > 0)) return -9999;
+
+      const enemy = enemySym(sym);
+      let score = 0;
+
+      G.board[r][c].owner = sym;
+      if (checkWin(sym)) score += 1000;
+      score += linePotential(sym, r, c) * 9;
+      G.board[r][c].owner = null;
+
+      G.board[r][c].owner = enemy;
+      if (checkWin(enemy)) score += 250;
+      score += linePotential(enemy, r, c) * 6;
+      G.board[r][c].owner = null;
+
+      score -= zoneTax(r, c, sym) * 3;
+      score += (2 - Math.abs(2 - r)) + (2 - Math.abs(2 - c));
+      if (cell.bonus) score += 6;
+
+      return score;
+    }
+
+    function linePotential(sym, r, c) {
+      let points = 0;
+      for (const [dr, dc] of DIRS) {
+        let mine = 0;
+        let blocked = 0;
+        for (let k = -3; k <= 3; k++) {
+          const rr = r + dr * k;
+          const cc = c + dc * k;
+          if (!inside(rr, cc)) continue;
+          const owner = G.board[rr][cc].owner;
+          if (owner === sym) mine += 1;
+          if (owner && owner !== sym) blocked += 1;
+        }
+        points += Math.max(0, mine - blocked);
+      }
+      return points;
+    }
+
+    function countEmptyCells() {
+      let n = 0;
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (!G.board[r][c].owner) n += 1;
+        }
+      }
+      return n;
+    }
+
+    function updateThreats() {
+      const p = current();
+      G.threatCells = p.role === 'controller' ? detectThreatCells(p.sym) : [];
+    }
+
+    function log(text) {
+      const row = document.createElement('div');
+      row.textContent = `[Ход ${G?.turn ?? 0}] ${text}`;
+      logEl.prepend(row);
+    }
+
+    function render() {
+      renderBoard();
+      renderStatus();
+      renderButtons();
+    }
+
+    function renderBoard() {
+      const p = current();
+      const threat = new Set(G.threatCells.map(([r, c]) => `${r},${c}`));
+      const zones = new Set();
+      adjacentPairs(opponent().sym).forEach(([a, b]) => {
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            if (isNearPair(r, c, a, b)) zones.add(`${r},${c}`);
+          }
+        }
+      });
+
+      [...boardEl.children].forEach(el => {
+        const r = Number(el.dataset.r);
+        const c = Number(el.dataset.c);
+        const cell = G.board[r][c];
+
+        el.className = 'cell';
+        if (cell.blocked > 0) el.classList.add('blocked');
+        if (cell.bonus) el.classList.add('bonus');
+        if (zones.has(`${r},${c}`)) el.classList.add('zone');
+        if (threat.has(`${r},${c}`) && p.role === 'controller') el.classList.add('threat');
+
+        el.innerHTML = `<span class="coord">${coord(r, c)}</span>`;
+        if (!cell.owner) return;
+
+        const own = cell.owner === p.sym;
+        const revealed = !cell.hidden || own || G.revealFor === p.sym || G.mindMode;
+        const span = document.createElement('span');
+
+        if (G.mindMode) {
+          span.textContent = own ? '●' : '◌';
+          span.style.color = own ? 'var(--ok)' : 'var(--danger)';
+        } else {
+          span.textContent = revealed ? cell.owner : '◼';
+          span.className = cell.owner === 'X' ? 'x' : 'o';
+        }
+        el.appendChild(span);
+      });
+    }
+
+    function renderStatus() {
+      const p = current();
+      const o = opponent();
+      statusEl.innerHTML = `
+        <div>
+          <span class="badge">Ход: ${G.current}</span>
+          <span class="badge">AP: ${p.ap}</span>
+          <span class="badge">Роль: ${ROLE_META[p.role].name}</span>
+        </div>
+        <div>Перезарядки: Брандмауэр ${p.cds.firewall} • Сканер ${p.cds.scan} • Эксплойт ${p.cds.exploit}</div>
+        <div>Откат: ${p.once.rollback ? 'доступен' : 'использован'} • Противник: ${o.sym} (${ROLE_META[o.role].name})</div>
+        <div>Режим: ${G.gameMode === 'pve' ? `против бота (${G.botLevel})` : 'локальный PvP'}</div>
+        <div>${G.gameOver ? (G.winner === 'draw' ? 'Партия завершена: ничья.' : `Партия завершена: победил ${G.winner}.`) : 'Игра продолжается.'}</div>
+      `;
+      ui.roleSkill.textContent = ROLE_META[p.role].button;
+    }
+
+    function renderButtons() {
+      const p = current();
+      const lock = G.gameOver;
+
+      ui.modePlace.disabled = lock;
+      ui.endTurn.disabled = lock;
+      ui.firewall.disabled = lock || p.ap < 2 || p.cds.firewall > 0;
+      ui.scan.disabled = lock || p.ap < 1 || p.cds.scan > 0;
+      ui.exploit.disabled = lock || p.ap < 2 || p.cds.exploit > 0;
+      ui.rollback.disabled = lock || !p.once.rollback;
+
+      if (p.role === 'controller') ui.roleSkill.disabled = lock || p.ap < 1;
+      if (p.role === 'aggressor') ui.roleSkill.disabled = lock || !p.once.assault || p.ap < 1;
+      if (p.role === 'manipulator') ui.roleSkill.disabled = lock || !p.once.shadow || p.ap < 1;
+      if (isBotTurn()) {
+        ui.modePlace.disabled = true;
+        ui.endTurn.disabled = true;
+        ui.firewall.disabled = true;
+        ui.scan.disabled = true;
+        ui.exploit.disabled = true;
+        ui.rollback.disabled = true;
+        ui.roleSkill.disabled = true;
+      }
+    }
+
+    ui.restart.addEventListener('click', init);
+    ui.modePlace.addEventListener('click', () => { G.mode = 'place'; log(`${current().sym}: режим установки.`); render(); });
+    ui.endTurn.addEventListener('click', endTurn);
+    ui.scan.addEventListener('click', scan);
+
+    ui.firewall.addEventListener('click', () => {
+      if (G.gameOver) return;
+      G.mode = 'firewall';
+      log(`${current().sym}: выберите клетку для «Брандмауэра».`);
+      render();
+    });
+
+    ui.exploit.addEventListener('click', () => {
+      if (G.gameOver) return;
+      G.mode = 'exploit';
+      log(`${current().sym}: выберите заблокированную клетку для «Эксплойта».`);
+      render();
+    });
+
+    ui.rollback.addEventListener('click', rollback);
+
+    ui.roleSkill.addEventListener('click', () => {
+      const p = current();
+      if (p.role === 'controller') {
+        G.mode = 'lock';
+        log(`${p.sym}: выберите клетку для «Локдауна».`);
+      } else if (p.role === 'aggressor') {
+        if (p.ap < 1 || !p.once.assault) return;
+        p.ap -= 1;
+        G.mode = 'assault';
+        G.assaultRemaining = 2;
+        log(`${p.sym} активировал «Штурм»: поставьте две метки без затрат AP.`);
+      } else if (p.role === 'manipulator') {
+        if (!p.once.shadow) return;
+        G.mode = 'shadow';
+        log(`${p.sym}: поставьте скрытую метку («Тень»).`);
+      }
+      render();
+    });
+
+    init();
+  </script>
+</body>
+</html>
